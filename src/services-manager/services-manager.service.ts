@@ -89,8 +89,41 @@ export class ServicesManagerService {
             description: service.description,
             interpreter: service.interpreter,
             script: service.script,
+            packages: service.packages,
             scriptFilename
         };
+    }
+
+    private async setupPythonEnv(serviceDir: string, packages?: string) {
+        if (!packages || !packages.trim()) return null; // Return null if no extra env needed
+
+        this.logger.log(`Setting up Python virtual environment in ${serviceDir}...`);
+        
+        // 1. Create Verify Env
+        const venvPath = path.join(serviceDir, 'venv');
+        // Use the configured python path to create the venv
+        const pythonPath = this.configService.get('SERVICES_PYTHON_PATH', 'python3');
+        
+        if (!existsSync(venvPath)) {
+            await this.runCommand(`${pythonPath} -m venv ${venvPath}`, true);
+        }
+
+        // 2. Write requirements.txt
+        const reqPath = path.join(serviceDir, 'requirements.txt');
+        await fs.writeFile(reqPath, packages);
+
+        // 3. Install
+        const pipPath = path.join(venvPath, 'bin', 'pip');
+        try {
+            this.logger.log(`Installing packages via ${pipPath}...`);
+            await this.runCommand(`${pipPath} install -r ${reqPath}`, true);
+        } catch (e) {
+            this.logger.error('Failed to install python packages', e);
+            throw new InternalServerErrorException(`Failed to install python packages: ${e.message}`);
+        }
+
+        // Return the interpreter path inside venv
+        return path.join(venvPath, 'bin', 'python');
     }
 
     async createService(dto: CreateServiceDto) {
@@ -112,18 +145,25 @@ export class ServicesManagerService {
         const scriptPath = path.join(serviceDir, `main.${ext}`);
         await fs.writeFile(scriptPath, dto.script);
 
-        // 3. Save to DB
+        // 3. Setup Python Env (if applicable)
+        let interpreterCmd = this.getInterpreterPath(dto.interpreter);
+        if (dto.interpreter === 'python3' && dto.packages) {
+             const venvPython = await this.setupPythonEnv(serviceDir, dto.packages);
+             if (venvPython) interpreterCmd = venvPython;
+        }
+
+        // 4. Save to DB
         const service = this.servicesRepository.create({
             name: sanitizedName,
             description: dto.description,
             interpreter: dto.interpreter,
             script: dto.script,
+            packages: dto.packages,
             enabled: true
         });
         await this.servicesRepository.save(service);
 
-        // 4. Generate Systemd Unit
-        const interpreterCmd = this.getInterpreterPath(dto.interpreter);
+        // 5. Generate Systemd Unit
         const unitContent = `[Unit]
 Description=${dto.description || `Custom Service ${sanitizedName}`}
 After=network.target
@@ -134,7 +174,7 @@ User=${this.serviceUser}
 WorkingDirectory=${serviceDir}
 ExecStart=${interpreterCmd} ${scriptPath}
 Restart=always
-RestartSec=10
+RestartSec=3
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=custom-${sanitizedName}
@@ -176,7 +216,8 @@ WantedBy=multi-user.target
         // Update DB
         service.description = dto.description;
         service.script = dto.script;
-        service.interpreter = dto.interpreter; // If this changes, we might need to update systemd unit
+        service.interpreter = dto.interpreter;
+        service.packages = dto.packages;
         await this.servicesRepository.save(service);
 
         // Update script file
@@ -184,13 +225,15 @@ WantedBy=multi-user.target
         const scriptPath = path.join(serviceDir, `main.${ext}`);
         await fs.writeFile(scriptPath, dto.script);
 
-        // If interpreter changed, we MUST update systemd unit. 
-        // For simplicity, let's treat update as "update content". 
-        // If interpreter changes, we should ideally re-run the "Generate Systemd Unit" block.
-        // Let's re-generate unit every update to be safe.
-        
+        // Update Python Env (if applicable)
+        let interpreterCmd = this.getInterpreterPath(dto.interpreter);
+        if (dto.interpreter === 'python3' && dto.packages) {
+             const venvPython = await this.setupPythonEnv(serviceDir, dto.packages);
+             if (venvPython) interpreterCmd = venvPython;
+        }
+
+        // Re-generate systemd unit
         const serviceName = `custom-${name}.service`;
-        const interpreterCmd = this.getInterpreterPath(dto.interpreter);
         const unitContent = `[Unit]
 Description=${dto.description || `Custom Service ${name}`}
 After=network.target

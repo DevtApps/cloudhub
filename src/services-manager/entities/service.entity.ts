@@ -17,6 +17,9 @@ export class SystemService {
   @Column({ type: 'text' })
   script: string;
 
+  @Column({ type: 'text', nullable: true })
+  packages: string;
+
   @Column({ default: true })
   enabled: boolean;
 

@@ -15,4 +15,8 @@ export class CreateServiceDto {
     @IsOptional()
     @IsString()
     description?: string;
+
+    @IsOptional()
+    @IsString()
+    packages?: string;
 }
