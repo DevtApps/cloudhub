@@ -5,10 +5,9 @@ import { BullModule } from '@nestjs/bull';
 import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
 
-import { RegexModule } from './regex/regex.module';
-import { QueuesModule } from './queues/queues.module';
 import { SystemModule } from './system/system.module';
-import { SourcesModule } from './sources/sources.module';
+import { MetricAgentModule } from './metric-agent/metric-agent.module';
+import { FirewallModule } from './firewall/firewall.module';
 
 @Module({
   imports: [
@@ -16,10 +15,9 @@ import { SourcesModule } from './sources/sources.module';
       isGlobal: true,
     }),
     // ...
-    RegexModule,
-    QueuesModule,
     SystemModule,
-    SourcesModule,
+    MetricAgentModule,
+    FirewallModule,
   
     // Database Connection
     TypeOrmModule.forRootAsync({
