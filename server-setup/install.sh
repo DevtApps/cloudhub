@@ -71,7 +71,7 @@ fi
 # 4. Deploy Backend
 echo ">>> Deploying backend..."
 # Sync files excluding heavy node_modules which we install fresh
-rsync -av --delete --exclude='node_modules' --exclude='dist' --exclude='.env' "$SOURCE_DIR/backend/" "$BACKEND_DEST/"
+rsync -av --delete --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' "$SOURCE_DIR/" "$BACKEND_DEST/"
 
 # 5. Install Dependencies and Build
 echo ">>> Installing dependencies..."
