@@ -1,0 +1,19 @@
+[Unit]
+Description=Cloud Hub Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=cloud-hub
+Group=cloud-hub
+WorkingDirectory=/opt/cloud-hub/backend
+EnvironmentFile=/etc/cloudhub/hub.conf
+ExecStart=/usr/bin/node dist/main.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=cloud-hub
+
+[Install]
+WantedBy=multi-user.target
