@@ -22,6 +22,11 @@ fi
 NODE_VERSION="v20.11.0"
 NODE_DIR="$INSTALL_DIR/node"
 
+PYTHON_VERSION="3.12.1"
+PYTHON_DIR="$INSTALL_DIR/python"
+# Using python-build-standalone for a portable build
+PYTHON_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240107/cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz"
+
 echo ">>> Starting Cloud Hub Installation..."
 
 # 0. Dependencies
@@ -94,6 +99,26 @@ else
     echo ">>> Local Node.js found at $NODE_DIR"
 fi
 
+# Setup Local Python 3.12
+if [ ! -f "$PYTHON_DIR/bin/python3" ]; then
+    echo ">>> Downloading Python $PYTHON_VERSION..."
+    cd /tmp
+    curl -L -O "$PYTHON_URL"
+    
+    echo ">>> Extracting Python..."
+    # The tarball extracts to ./python
+    tar -xf cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz
+    
+    if [ -d "python" ]; then
+        rm -rf $PYTHON_DIR
+        mv python $PYTHON_DIR
+    fi
+    
+    rm cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz
+else
+    echo ">>> Local Python found at $PYTHON_DIR"
+fi
+
 # Use local node for build
 export PATH="$NODE_DIR/bin:$PATH"
 
@@ -111,13 +136,28 @@ pnpm build
 # Fix permissions
 chown -R $USER:$USER $INSTALL_DIR
 
-# 5.1 Sudoers for IPTables
-echo ">>> Configuring sudo access for Firewall..."
-SUDO_FILE="/etc/sudoers.d/cloud-hub-iptables"
+# Create Custom Services Directory
+mkdir -p "$INSTALL_DIR/custom-services"
+chown -R $USER:$USER "$INSTALL_DIR/custom-services"
+
+# 5.1 Sudoers for Firewall & Services
+echo ">>> Configuring sudo rights..."
+SUDO_FILE="/etc/sudoers.d/cloud-hub-permissions"
 if [ ! -f "$SUDO_FILE" ]; then
+    # Firewall
     echo "$USER ALL=(root) NOPASSWD: /usr/sbin/iptables" > $SUDO_FILE
-    # Also allow standard binary locations just in case
     echo "$USER ALL=(root) NOPASSWD: /sbin/iptables" >> $SUDO_FILE
+    
+    # Systemd Management (Restricted to custom-* services for safety if possible, but here we give broad access for management)
+    # We allow managing any service, but ideally the app should only touch its own.
+    echo "$USER ALL=(root) NOPASSWD: /bin/systemctl" >> $SUDO_FILE
+    echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl" >> $SUDO_FILE
+    
+    # Allow writing service files
+    # We use 'tee' to write files as root
+    echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/systemd/system/*.service" >> $SUDO_FILE
+    echo "$USER ALL=(root) NOPASSWD: /usr/bin/rm /etc/systemd/system/*.service" >> $SUDO_FILE
+    
     chmod 0440 $SUDO_FILE
 fi
 
@@ -130,6 +170,14 @@ if [ ! -f "$CONF_FILE" ]; then
     echo ">>> Created default configuration at $CONF_FILE"
 else
     echo ">>> Preserving existing configuration at $CONF_FILE"
+fi
+
+# Ensure Services Paths are in config (for updates)
+if ! grep -q "SERVICES_NODE_PATH" $CONF_FILE; then
+    echo "SERVICES_NODE_PATH=/opt/cloud-hub/node/bin/node" >> $CONF_FILE
+fi
+if ! grep -q "SERVICES_PYTHON_PATH" $CONF_FILE; then
+    echo "SERVICES_PYTHON_PATH=/opt/cloud-hub/python/bin/python3" >> $CONF_FILE
 fi
 
 # 7. Systemd Service
