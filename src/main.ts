@@ -39,7 +39,7 @@ async function bootstrap() {
 
   // Start Server
   const port = configService.get('API_PORT', 3001);
-  await app.listen(port);
+  await app.listen(port,'0.0.0.0');
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();
