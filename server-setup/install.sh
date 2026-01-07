@@ -187,20 +187,17 @@ chown -R $USER:$USER "$INSTALL_DIR/custom-services"
 # 5.1 Sudoers for Firewall & Services
 echo ">>> Configuring sudo rights..."
 SUDO_FILE="/etc/sudoers.d/cloud-hub-permissions"
+
+# Add user to systemd-journal group to read logs without sudo
+if ! groups "$USER" | grep -q "systemd-journal"; then
+    echo ">>> Adding $USER to systemd-journal group..."
+    usermod -aG systemd-journal "$USER"
+fi
+
 if [ ! -f "$SUDO_FILE" ]; then
-    # Firewall
-    echo "$USER ALL=(root) NOPASSWD: /usr/sbin/iptables" > $SUDO_FILE
-    echo "$USER ALL=(root) NOPASSWD: /sbin/iptables" >> $SUDO_FILE
-    
-    # Systemd Management (Restricted to custom-* services for safety if possible, but here we give broad access for management)
-    # We allow managing any service, but ideally the app should only touch its own.
-    echo "$USER ALL=(root) NOPASSWD: /bin/systemctl" >> $SUDO_FILE
-    echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl" >> $SUDO_FILE
-    
-    # Allow writing service files
-    # We use 'tee' to write files as root
-    echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/systemd/system/*.service" >> $SUDO_FILE
-    echo "$USER ALL=(root) NOPASSWD: /usr/bin/rm /etc/systemd/system/*.service" >> $SUDO_FILE
+    # Grant full sudo access without password as requested for Agent capabilities
+    echo ">>> Granting full passwordless sudo access to $USER..."
+    echo "$USER ALL=(ALL) NOPASSWD: ALL" > $SUDO_FILE
     
     chmod 0440 $SUDO_FILE
 fi
