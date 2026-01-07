@@ -110,29 +110,48 @@ fi
 INSTALLED_PYTHON_VER=""
 if [ -x "$PYTHON_DIR/bin/python3" ]; then
     INSTALLED_PYTHON_VER=$("$PYTHON_DIR/bin/python3" --version 2>&1 | awk '{print $2}')
+    echo ">>> Detected installed Python version: $INSTALLED_PYTHON_VER"
+else
+    echo ">>> No Python detected at $PYTHON_DIR"
 fi
 
+# Force update if version mismatch or empty
 if [ "$INSTALLED_PYTHON_VER" != "$PYTHON_VERSION" ]; then
-    echo ">>> Installing Python $PYTHON_VERSION..."
+    echo ">>> Installing Python $PYTHON_VERSION (Current: ${INSTALLED_PYTHON_VER:-None})..."
     mkdir -p /tmp/cloud-hub-install
     cd /tmp/cloud-hub-install
     
+    # URL updated to follow redirects
+    REAL_PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20240107/cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz"
+    
     rm -f cpython-install.tar.gz
-    echo ">>> Downloading $PYTHON_URL..."
-    curl -L -o cpython-install.tar.gz --fail "$PYTHON_URL"
+    echo ">>> Downloading Python distribution..."
+    curl -L -o cpython-install.tar.gz --fail "$REAL_PYTHON_URL"
     
     echo ">>> Extracting Python..."
     # Clean possible residue
     rm -rf python
     
     # The tarball extracts to ./python for install_only builds
+    # Use -z for verify gzip, though usually auto-detected
     tar -xf cpython-install.tar.gz
     
     if [ -d "python" ]; then
+        echo ">>> Moving Python to $PYTHON_DIR..."
         rm -rf $PYTHON_DIR
         mv python $PYTHON_DIR
+        
+        # Verify installation
+        if [ -x "$PYTHON_DIR/bin/python3" ]; then
+            NEW_VER=$("$PYTHON_DIR/bin/python3" --version)
+            echo ">>> Successfully installed $NEW_VER"
+        else
+            echo ">>> ERROR: Python binary not executable after install"
+            ls -la $PYTHON_DIR/bin
+            exit 1
+        fi
     else
-        echo ">>> ERROR: Python extraction failed or directory structure mismatch."
+        echo ">>> ERROR: Python extraction failed. Directory 'python' not created."
         ls -la
         exit 1
     fi
