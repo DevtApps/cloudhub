@@ -31,15 +31,11 @@ echo ">>> Starting Cloud Hub Installation..."
 
 # 0. Dependencies
 echo ">>> Checking dependencies..."
-if ! command -v git &> /dev/null; then
-    echo ">>> Installing Git..."
-    apt-get update && apt-get install -y git
-fi
-
-if ! command -v rsync &> /dev/null; then
-    echo ">>> Installing rsync..."
-    apt-get update && apt-get install -y rsync
-fi
+# Install essential build and utility tools
+DEPS="git rsync curl tar xz-utils ca-certificates"
+echo ">>> Installing dependencies: $DEPS..."
+apt-get update
+apt-get install -y $DEPS
 
 # Detect update mode
 if systemctl is-active --quiet cloud-hub; then
@@ -83,40 +79,67 @@ echo ">>> Installing dependencies..."
 cd $BACKEND_DEST
 
 # Setup Local Node.js
-if [ ! -f "$NODE_DIR/bin/node" ]; then
-    echo ">>> Downloading Node.js $NODE_VERSION..."
-    cd /tmp
-    curl -O https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz
+INSTALLED_NODE_VER=""
+if [ -x "$NODE_DIR/bin/node" ]; then
+    INSTALLED_NODE_VER=$("$NODE_DIR/bin/node" -v)
+fi
+
+if [ "$INSTALLED_NODE_VER" != "$NODE_VERSION" ]; then
+    echo ">>> Installing Node.js $NODE_VERSION..."
+    mkdir -p /tmp/cloud-hub-install
+    cd /tmp/cloud-hub-install
+    
+    rm -f node-$NODE_VERSION-linux-x64.tar.xz
+    curl -L -O --fail "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz"
     
     echo ">>> Extracting Node.js..."
     tar -xf node-$NODE_VERSION-linux-x64.tar.xz
-    rm node-$NODE_VERSION-linux-x64.tar.xz
+    
+    # Clean old version
+    rm -rf $NODE_DIR
     
     # Move to install dir
-    rm -rf $NODE_DIR
     mv node-$NODE_VERSION-linux-x64 $NODE_DIR
+    
+    rm node-$NODE_VERSION-linux-x64.tar.xz
 else
-    echo ">>> Local Node.js found at $NODE_DIR"
+    echo ">>> Local Node.js $NODE_VERSION already installed at $NODE_DIR"
 fi
 
 # Setup Local Python 3.12
-if [ ! -f "$PYTHON_DIR/bin/python3" ]; then
-    echo ">>> Downloading Python $PYTHON_VERSION..."
-    cd /tmp
-    curl -L -O "$PYTHON_URL"
+INSTALLED_PYTHON_VER=""
+if [ -x "$PYTHON_DIR/bin/python3" ]; then
+    INSTALLED_PYTHON_VER=$("$PYTHON_DIR/bin/python3" --version 2>&1 | awk '{print $2}')
+fi
+
+if [ "$INSTALLED_PYTHON_VER" != "$PYTHON_VERSION" ]; then
+    echo ">>> Installing Python $PYTHON_VERSION..."
+    mkdir -p /tmp/cloud-hub-install
+    cd /tmp/cloud-hub-install
+    
+    rm -f cpython-install.tar.gz
+    echo ">>> Downloading $PYTHON_URL..."
+    curl -L -o cpython-install.tar.gz --fail "$PYTHON_URL"
     
     echo ">>> Extracting Python..."
-    # The tarball extracts to ./python
-    tar -xf cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz
+    # Clean possible residue
+    rm -rf python
+    
+    # The tarball extracts to ./python for install_only builds
+    tar -xf cpython-install.tar.gz
     
     if [ -d "python" ]; then
         rm -rf $PYTHON_DIR
         mv python $PYTHON_DIR
+    else
+        echo ">>> ERROR: Python extraction failed or directory structure mismatch."
+        ls -la
+        exit 1
     fi
     
-    rm cpython-3.12.1+20240107-x86_64-unknown-linux-gnu-install_only.tar.gz
+    rm cpython-install.tar.gz
 else
-    echo ">>> Local Python found at $PYTHON_DIR"
+    echo ">>> Local Python $PYTHON_VERSION already installed at $PYTHON_DIR"
 fi
 
 # Use local node for build
