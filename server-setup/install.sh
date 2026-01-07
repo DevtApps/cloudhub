@@ -32,7 +32,8 @@ echo ">>> Starting Cloud Hub Installation..."
 # 0. Dependencies
 echo ">>> Checking dependencies..."
 # Install essential build and utility tools
-DEPS="git rsync curl tar xz-utils ca-certificates"
+# clang is required for compiling python extensions
+DEPS="git rsync curl tar xz-utils ca-certificates build-essential clang"
 echo ">>> Installing dependencies: $DEPS..."
 apt-get update
 apt-get install -y $DEPS
@@ -48,7 +49,8 @@ if id "$USER" &>/dev/null; then
     echo ">>> User $USER already exists."
 else
     echo ">>> Creating user $USER..."
-    useradd -r -s /bin/false $USER
+    # Create system user, home = /opt/cloud-hub (so pip cache works), no login shell
+    useradd -r -d $INSTALL_DIR -s /bin/false $USER
 fi
 
 # 2. Setup Directories
