@@ -8,6 +8,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 
 import { SystemModule } from './system/system.module';
+import { FilesModule } from './files/files.module';
 import { MetricAgentModule } from './metric-agent/metric-agent.module';
 import { FirewallModule } from './firewall/firewall.module';
 import { ServicesManagerModule } from './services-manager/services-manager.module';
@@ -28,6 +29,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
     AuthModule,
     SystemModule,
+    FilesModule,
     MetricAgentModule,
     FirewallModule,
     ServicesManagerModule,
