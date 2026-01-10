@@ -122,27 +122,31 @@ export class RegexController {
       if (!parsed.success) continue;
 
       matchedCount++;
-      results.push({
-        lineNumber: i + 1,
-        line,
-        patternId: parsed.patternId,
-        patternKey: parsed.patternKey,
-        data: parsed.data,
-      });
-
-      if (enqueue) {
-        await this.queuesService.addJob(queueName, {
-          source: 'file-test',
-          sourceId: null,
-          fileName: file.originalname,
+      
+      // Iterate through all matches
+      for (const match of parsed.matches) {
+        results.push({
           lineNumber: i + 1,
-          patternKey: parsed.patternKey,
-          patternId: parsed.patternId,
-          data: parsed.data,
-          timestamp: new Date().toISOString(),
-          originalLine: line,
+          line,
+          patternId: match.patternId,
+          patternKey: match.patternKey,
+          data: match.data,
         });
-        enqueuedCount++;
+
+        if (enqueue) {
+          await this.queuesService.addJob(queueName, {
+            source: 'file-test',
+            sourceId: null,
+            fileName: file.originalname,
+            lineNumber: i + 1,
+            patternKey: match.patternKey,
+            patternId: match.patternId,
+            data: match.data,
+            timestamp: new Date().toISOString(),
+            originalLine: line,
+          });
+          enqueuedCount++;
+        }
       }
     }
 
