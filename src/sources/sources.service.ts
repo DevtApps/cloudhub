@@ -154,8 +154,8 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
         const parseResult = this.regexService.matchPatterns(line, patternsToUse);
         
         if (parseResult.success) {
-            // Build payload with PostfixMessage structure
-            const payload = {
+            // Build payload with PostfixMessage base structure
+            const payload: Record<string, any> = {
                 ts: '',
                 host: '',
                 program: '',
@@ -171,12 +171,10 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
                 message_id: '',
             };
 
-            // Override with matched groups
+            // Add all matched groups (including extra keys)
             for (const match of parseResult.matches) {
                 for (const [key, value] of Object.entries(match.data)) {
-                    if (key in payload) {
-                        (payload as any)[key] = key === 'pid' ? parseInt(value as string, 10) || 0 : value;
-                    }
+                    payload[key] = key === 'pid' ? parseInt(value as string, 10) || 0 : value;
                 }
             }
             
