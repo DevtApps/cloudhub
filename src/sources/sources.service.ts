@@ -154,17 +154,31 @@ export class SourcesService implements OnModuleInit, OnModuleDestroy {
         const parseResult = this.regexService.matchPatterns(line, patternsToUse);
         
         if (parseResult.success) {
-            // Push to queue
+            // Build payload with PostfixMessage structure
             const payload = {
-                source: source.name,
-                sourceId: source.id,
-                patternKey: parseResult.patternKey,
-                data: parseResult.data,
-                timestamp: new Date().toISOString(),
-                originalLine: line
+                ts: '',
+                host: '',
+                program: '',
+                message: '',
+                service: '',
+                component: '',
+                pid: 0,
+                detail: '',
+                queue_id: '',
+                to: '',
+                status: '',
+                subsystem: '',
+                message_id: '',
             };
-            
-            this.logger.debug(`Match found [${parseResult.patternKey}] in ${source.name}. Enqueuing to ${source.targetQueue}`);
+
+            // Override with matched groups
+            for (const match of parseResult.matches) {
+                for (const [key, value] of Object.entries(match.data)) {
+                    if (key in payload) {
+                        (payload as any)[key] = key === 'pid' ? parseInt(value as string, 10) || 0 : value;
+                    }
+                }
+            }
             
             try {
                 await this.queuesService.addJob(source.targetQueue, payload);

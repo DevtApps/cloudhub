@@ -126,6 +126,7 @@ export class RegexService implements OnModuleInit {
   }
 
   matchPatterns(line: string, patterns: RegexPattern[]) {
+      const results = [];
       for (const p of patterns) {
           if (!p.enabled) continue;
           try {
@@ -133,17 +134,24 @@ export class RegexService implements OnModuleInit {
               const match = regex.exec(line);
               if (match) {
                   const groups = match.groups || {};
-                  return {
-                      success: true,
+                  results.push({
                       patternId: p.id,
                       patternKey: p.key,
                       data: groups
-                  };
+                  });
               }
           } catch (e) {
               // Ignore invalid regexes during runtime
           }
       }
+
+      if (results.length > 0) {
+          return {
+              success: true,
+              matches: results
+          };
+      }
+
       return { success: false, message: "No match found" };
   }
 
